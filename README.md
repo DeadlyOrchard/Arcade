@@ -1,7 +1,7 @@
-#Repository Purpose
+# Repository Purpose
 I'll be writing little arcade games using the gcc compiler and SDL2 libraries. The games will be created individually and then built into one executable.
 
-##Build/Compile Instructions
+## Build/Compile Instructions
 - As of 4/28/2024,
 - `cmd /c chcp 65001>nul && {compiler_dir} -fdiagnostics-color=always -g {working_dir}\main.cpp -I {SDL2_mingw32_dir}\include -L {SDL2_mingw32_dir}\lib -Wall -lmingw32 -lSDL2main -lSDL2 -o {out}\main.exe`
 - Where
