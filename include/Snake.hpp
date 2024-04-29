@@ -1,17 +1,17 @@
 #ifndef SNAKE_HPP
 #define SNAKE_HPP
 
-struct SnakeCell {
+struct SnakeNode {
     int x;
     int y;
-    SnakeCell* nextCell;
+    SnakeNode* next;
 };
 
 class Snake {
 private:
     int length;
     int speed;
-    SnakeCell head;
+    SnakeNode head;
     bool isGrowing = false;
 
 public:

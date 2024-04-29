@@ -1,37 +1,46 @@
 #include "Snake.hpp"
+#include <iostream>
 
 Snake::Snake(int length, int speed, int x, int y) {
     this->length = length;
     this->speed = speed;
     head.x = x;
     head.y = y;
-    head.nextCell = nullptr;
+    head.next = nullptr;
 }
 
 void Snake::move(char direction) {
-    SnakeCell curr = this->head;
-    while (head.nextCell != nullptr) {
-        curr = *head.nextCell;
-    }
-    SnakeCell next;
+    // create new head, then remove the last node unless the snake isGrowing
+    SnakeNode newNode;
     switch (direction) {
         case 'r': // right
-        next.x = curr.x + this->speed;
+        newNode.x = this->head.x + this->speed;
+        newNode.y = this->head.y;
         break;
         case 'l': // left
-        next.x = curr.x - this->speed;
+        newNode.x = this->head.x - this->speed;
+        newNode.y = this->head.y;
         break;
         case 'u': // up
-        next.y = curr.y + this->speed;
+        newNode.y = this->head.y + this->speed;
+        newNode.x = this->head.x;
         break;
         case 'd': // down
-        next.y = curr.y - this->speed;
+        newNode.y = this->head.y - this->speed;
+        newNode.x = this->head.x;
         break;
     }
-    curr.nextCell = &next;
+    newNode.next = &this->head;
+    this->head = newNode;
+    this->length++;
     if (!this->isGrowing) {
-        this->head = *this->head.nextCell;
-    }
+        SnakeNode curr = this->head;
+        for (int i = 0; i < this->length - 1; i++) {
+            curr = *curr.next;
+        }
+        curr.next = nullptr;
+        this->length--;
+    } 
 }
 
 int Snake::getX() {

@@ -1,4 +1,2 @@
-.vscode/c_cpp_properties.json
-SDL2.dll
-main.exe
-.vscode/tasks.json
+.vscode/*
+bin/*
