@@ -4,7 +4,7 @@
 - The first game to be added to the arcade is Snake
 
 ## Build/Compile Instructions
-- As of 4/28/2024,
+- As of 4/29/2024,
 - `${compiler_dir} -g ${workspaceFolder}\main.cpp -I ${SDL2_mingw32_dir}\include -L ${SDL2_mingw32_dir}\lib -lmingw32 -lSDL2main -lSDL2 ${workspaceFolder}\include\*.cpp -o ${out}\main.exe`
 - Where
   - `{compiler_dir}` is the location of the c++ compiler,

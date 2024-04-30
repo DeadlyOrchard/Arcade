@@ -1,5 +1,6 @@
-#ifndef SNAKE_HPP
-#define SNAKE_HPP
+#pragma once
+#include <stdio.h>
+#include <SDL2/SDL.h>
 
 struct SnakeNode {
     int x;
@@ -9,17 +10,17 @@ struct SnakeNode {
 
 class Snake {
 private:
+    SnakeNode head;
     int length;
     int speed;
-    SnakeNode head;
+    int nodeSize;
+    char direction;
     bool isGrowing = false;
 
 public:
-    Snake(int length, int speed, int x, int y);    // creates a snake
-    int grow(); 
-    void move(char direction);
-    int getX();
-    int getY();
+    Snake(int length, int speed, int nodeSize, char direction, int x, int y);
+    void grow(); 
+    void turn(char direction);
+    void move();
+    void draw(SDL_Renderer* r);
 };
-
-#endif
