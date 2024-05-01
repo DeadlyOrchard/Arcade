@@ -5,10 +5,10 @@
 
 ## Build/Compile Instructions
 - As of 4/29/2024,
-- `${compiler_dir} -g ${workspaceFolder}\main.cpp -I ${SDL2_mingw32_dir}\include -L ${SDL2_mingw32_dir}\lib -lmingw32 -lSDL2main -lSDL2 ${workspaceFolder}\include\*.cpp -o ${out}\main.exe`
+- `${compiler_loc} -g ${workspaceFolder}\main.cpp -I ${SDL2_mingw32_dir}\include -L ${SDL2_mingw32_dir}\lib -lmingw32 -lSDL2main -lSDL2 ${workspaceFolder}\include\*.cpp -o ${out}\main.exe`
 - Where
-  - `{compiler_dir}` is the location of the c++ compiler,
-    - **Note: ** When usince `gcc` compiler, the standard library does not link itself automatically. Add the flag `-lstdc++` to compile without getting `undefined reference to...` errors.
+  - `{compiler_loc}` is the location of the c++ compiler,
+    - Note: best to use g++ compiler to avoid linker errors.
   - `{workspaceFolder}` is the location of the overall application folder,
   - `{SDL_mingw32_dir}` is the location of the SDL2 library built for mingw32,
     - After downloading [ SDL2-devel-2.30.2-mingw.zip ](https://github.com/libsdl-org/SDL/releases/tag/release-2.30.2),
