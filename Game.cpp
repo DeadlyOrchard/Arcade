@@ -4,18 +4,19 @@
 #include <iostream>
 
 
-Game::Game(int width, int height, int blockSize, int delay) {
+Game::Game(int width, int height, int delay) {
     this->running = true;
     this->width = width;
     this->height = height;
     this->delay = delay;
-    this->blockSize = blockSize;
 }
 
 void Game::run() {
     this->win = SDL_CreateWindow("Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, this->width, this->height, NULL);
     this->ren = SDL_CreateRenderer(this->win, -1, NULL);
-    Snake snake = Snake(20, this->blockSize, 'r', 200, 200);
+    const int snakeSize = 20;
+    const int snakeLength = 8;
+    Snake snake = Snake(snakeLength, snakeSize, 'r', 400, 300, 0, 0, this->width - snakeSize, this->height - snakeSize);
     while (this->running) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -47,26 +48,27 @@ void Game::run() {
         SDL_SetRenderDrawColor(this->ren, 33, 33, 33, 255);
         SDL_RenderClear(this->ren);
         SDL_SetRenderDrawColor(this->ren, 255, 255, 255, 255);
-        SDL_Rect rect {0, 0, this->blockSize, this->blockSize};
-        int padding = this->blockSize / 2;
+        SDL_Rect rect {0, 0, snakeSize, snakeSize};
         int len = snake.getCurrentLength();
         SnakeNode* curr = snake.getHead();
         for (int i = 0; i < len; i++) {
-            rect.x = curr->x - padding;
-            rect.y = curr->y - padding;
+            rect.x = curr->x;
+            rect.y = curr->y;
             SDL_RenderDrawRect(this->ren, &rect);
             if (curr->next != nullptr) {
                 curr = curr->next;
             }
         }
         SDL_RenderPresent(this->ren);
-        snake.move();
-        SDL_Delay(100);
+        if (snake.getStatus()) {
+            snake.update();
+        }
+        SDL_Delay(this->delay);
     }
 }
 
 int main(int argc, char* argv[]) {
-    Game game = Game(800, 600, 20, 20);
+    Game game = Game(800, 600, 100);
     game.run();
     return 0;
 }

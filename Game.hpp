@@ -8,11 +8,10 @@ private:
     int width;
     int height;
     int delay;
-    int blockSize;
     SDL_Renderer* ren;
     SDL_Window* win;
 
 public:
-    Game(int width, int height, int blockSize, int delay);
+    Game(int width, int height, int delay);
     void run();
 };
