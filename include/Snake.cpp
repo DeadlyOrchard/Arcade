@@ -1,21 +1,34 @@
 #include "Snake.hpp"
+#include <time.h>
 #include <iostream>
 
-Snake::Snake(int length, int speed, char direction, int x, int y, int minX, int minY, int maxX, int maxY) {
-    this->speed = speed;
+Snake::Snake(int length, int nodeSize, char direction, int x, int y, int minX, int minY, int maxX, int maxY) {
+    this->nodeSize = nodeSize;
     this->direction = direction;
-    this->head = new SnakeNode{x, y, nullptr};
     this->length = length;
     this->currLength = 1;
+    this->head = new SnakeNode{x, y, nullptr};
     this->bounds[0] = minX;
     this->bounds[1] = minY;
     this->bounds[2] = maxX;
     this->bounds[3] = maxY;
     this->isAlive = true;
+    srand(time(0));
+    this->food = this->makeFood();
+}
+
+SnakeNode* Snake::makeFood() {
+    int x = rand() % (this->bounds[2] / this->nodeSize) * this->nodeSize;
+    int y = rand() % (this->bounds[3] / this->nodeSize) * this->nodeSize;
+    return new SnakeNode{x, y, nullptr};
 }
 
 SnakeNode* Snake::getHead() {
     return this->head;
+}
+
+SnakeNode* Snake::getFood() {
+    return this->food;
 }
 
 int Snake::getCurrentLength() {
@@ -61,19 +74,19 @@ void Snake::update() {
     int y;
     switch (this->direction) {
     case 'r': // right
-        x = this->head->x + this->speed;
+        x = this->head->x + this->nodeSize;
         y = this->head->y;
         break;
     case 'l': // left
-        x = this->head->x - this->speed;
+        x = this->head->x - this->nodeSize;
         y = this->head->y;
         break;
     case 'd': // down
-        y = this->head->y + this->speed;
+        y = this->head->y + this->nodeSize;
         x = this->head->x;
         break;
     case 'u': // up
-        y = this->head->y - this->speed;
+        y = this->head->y - this->nodeSize;
         x = this->head->x;
         break;
     }
@@ -83,6 +96,13 @@ void Snake::update() {
     if (outOfBounds) {
         this->isAlive = false;
         return;
+    }
+    
+    // check for food
+    bool foundFood = x == this->food->x && y == this->food->y;
+    if (foundFood) {
+        this->grow();
+        this->food = this->makeFood();
     }
     
     // check collisions

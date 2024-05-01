@@ -8,20 +8,23 @@ struct SnakeNode {
 
 class Snake {
 private:
-    bool isAlive;
     SnakeNode* head;
+    SnakeNode* food;
+    bool isAlive;
     int length;
     int currLength;
-    int speed;
+    int nodeSize;
     char direction;
     int bounds[4];
+    SnakeNode* makeFood();
 
 public:
-    Snake(int length, int speed, char direction, int x, int y, int minX, int minY, int maxX, int maxY);
+    Snake(int length, int nodeSize, char direction, int x, int y, int minX, int minY, int maxX, int maxY);
     void grow(); 
     void turn(char direction);
     void update();
-    SnakeNode* getHead();
     int getCurrentLength();
     bool getStatus();          // returns snake->isDead
+    SnakeNode* getHead();
+    SnakeNode* getFood();
 };

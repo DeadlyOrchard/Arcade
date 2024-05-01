@@ -12,7 +12,7 @@ Game::Game(int width, int height, int delay) {
 }
 
 void Game::run() {
-    this->win = SDL_CreateWindow("Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, this->width, this->height, NULL);
+    this->win = SDL_CreateWindow("Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, this->width, this->height, SDL_WINDOW_BORDERLESS);
     this->ren = SDL_CreateRenderer(this->win, -1, NULL);
     const int snakeSize = 20;
     const int snakeLength = 8;
@@ -26,15 +26,19 @@ void Game::run() {
                 break;
             case SDL_KEYDOWN:
                 switch (e.key.keysym.sym) {
+                case SDLK_d:
                 case SDLK_RIGHT:
                     snake.turn('r');
                     break;
+                case SDLK_a:
                 case SDLK_LEFT:
                     snake.turn('l');
                     break;
+                case SDLK_w:
                 case SDLK_UP:
                     snake.turn('u');
                     break;
+                case SDLK_s:
                 case SDLK_DOWN:
                     snake.turn('d');
                     break;
@@ -45,8 +49,11 @@ void Game::run() {
                 break;
             }
         }
+        // create background
         SDL_SetRenderDrawColor(this->ren, 33, 33, 33, 255);
         SDL_RenderClear(this->ren);
+
+        // draw snake
         SDL_SetRenderDrawColor(this->ren, 255, 255, 255, 255);
         SDL_Rect rect {0, 0, snakeSize, snakeSize};
         int len = snake.getCurrentLength();
@@ -59,7 +66,17 @@ void Game::run() {
                 curr = curr->next;
             }
         }
+
+        // draw food
+        SDL_SetRenderDrawColor(this->ren, 55, 55, 255, 255);
+        SnakeNode* food = snake.getFood();
+        rect.x = food->x;
+        rect.y = food->y;
+        SDL_RenderDrawRect(this->ren, &rect);
+
+        // present
         SDL_RenderPresent(this->ren);
+        // game logic
         if (snake.getStatus()) {
             snake.update();
         }
