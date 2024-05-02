@@ -1,30 +1,40 @@
 #pragma once
 
-struct SnakeNode {
-    int x;
-    int y;
-    SnakeNode* next;
+struct DrawData {
+    int dim[2];
+    int pos[2];
+    DrawData* next;
+};
+
+class DataList {
+private:
+    DrawData* head;
+    int length;
+public:
+    DataList(DrawData* head, int length);
+    DataList();
+    int getLength();
+    DrawData* getData();
+    void append(DrawData* d);
+    void insertAtHead(DrawData* d);
+    void cut(int i);
 };
 
 class Snake {
 private:
-    SnakeNode* head;
-    SnakeNode* food;
+    DrawData* food;
+    DataList data;
     bool isAlive;
     int length;
-    int currLength;
     int nodeSize;
     char direction;
     int bounds[4];
-    SnakeNode* makeFood();
+    DrawData* makeFood();
 
 public:
-    Snake(int length, int nodeSize, char direction, int x, int y, int minX, int minY, int maxX, int maxY);
-    void grow(); 
+    Snake(int length, int nodeSize, char direction, int x, int y, int xMin, int yMin, int xMax, int yMax);
     void turn(char direction);
     void update();
-    int getCurrentLength();
     bool getStatus();          // returns snake->isDead
-    SnakeNode* getHead();
-    SnakeNode* getFood();
+    DataList getData();
 };

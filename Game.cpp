@@ -56,23 +56,19 @@ void Game::run() {
         // draw snake
         SDL_SetRenderDrawColor(this->ren, 255, 255, 255, 255);
         SDL_Rect rect {0, 0, snakeSize, snakeSize};
-        int len = snake.getCurrentLength();
-        SnakeNode* curr = snake.getHead();
+
+        DataList data = snake.getData();
+        DrawData* curr = data.getData();
+        int len = data.getLength();
+
         for (int i = 0; i < len; i++) {
-            rect.x = curr->x;
-            rect.y = curr->y;
+            rect.x = curr->pos[0];
+            rect.y = curr->pos[1];
             SDL_RenderDrawRect(this->ren, &rect);
             if (curr->next != nullptr) {
                 curr = curr->next;
             }
         }
-
-        // draw food
-        SDL_SetRenderDrawColor(this->ren, 55, 55, 255, 255);
-        SnakeNode* food = snake.getFood();
-        rect.x = food->x;
-        rect.y = food->y;
-        SDL_RenderDrawRect(this->ren, &rect);
 
         // present
         SDL_RenderPresent(this->ren);

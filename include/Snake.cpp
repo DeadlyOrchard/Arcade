@@ -2,12 +2,61 @@
 #include <time.h>
 #include <iostream>
 
+DataList::DataList(DrawData* head, int length) {
+    this->length = length;
+    this->head = new DrawData{{head->dim[0], head->dim[1]}, {head->pos[0], head->pos[1]}, nullptr};
+    DrawData* curr = this->head;
+    DrawData* temp = head;
+    for (int i = 1; i < length; i++) {
+        temp = temp->next;
+        curr->next = new DrawData{ {temp->dim[0], temp->dim[1]}, {temp->pos[0], temp->pos[1]}, nullptr };
+        curr = curr->next;
+    }
+}
+
+DataList::DataList() {
+    this->length = 0;
+    this->head = nullptr;
+}
+
+int DataList::getLength() {
+    return this->length;
+}
+
+DrawData* DataList::getData() {
+    return this->head;
+}
+
+void DataList::insertAtHead(DrawData* d) {
+    DrawData* newHead = new DrawData{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, this->head };
+    this->head = newHead;
+    this->length++;
+}
+
+void DataList::append(DrawData* d) {
+    DrawData* curr = this->head;
+    for (int i = 0; i < this->length - 1; i++) {
+        curr = curr->next;
+    }
+    curr->next = new DrawData{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, nullptr };
+    this->length++;
+}
+
+void DataList::cut(int i) {
+    DrawData* curr = this->head;
+    for (int j = 0; j < i - 1; j++) {
+        curr = curr->next;
+    }
+    curr->next = nullptr;
+    this->length--;
+}
+
 Snake::Snake(int length, int nodeSize, char direction, int x, int y, int minX, int minY, int maxX, int maxY) {
     this->nodeSize = nodeSize;
     this->direction = direction;
     this->length = length;
-    this->currLength = 1;
-    this->head = new SnakeNode{x, y, nullptr};
+    DrawData* head = new DrawData{{this->nodeSize, this->nodeSize}, {x, y}, nullptr};
+    this->data = DataList(head, 1);
     this->bounds[0] = minX;
     this->bounds[1] = minY;
     this->bounds[2] = maxX;
@@ -17,30 +66,20 @@ Snake::Snake(int length, int nodeSize, char direction, int x, int y, int minX, i
     this->food = this->makeFood();
 }
 
-SnakeNode* Snake::makeFood() {
+DataList Snake::getData() {
+    DataList d = this->data;
+    d.append(this->food);
+    return d;
+}
+
+DrawData* Snake::makeFood() {
     int x = rand() % (this->bounds[2] / this->nodeSize) * this->nodeSize;
     int y = rand() % (this->bounds[3] / this->nodeSize) * this->nodeSize;
-    return new SnakeNode{x, y, nullptr};
-}
-
-SnakeNode* Snake::getHead() {
-    return this->head;
-}
-
-SnakeNode* Snake::getFood() {
-    return this->food;
-}
-
-int Snake::getCurrentLength() {
-    return this->currLength;
+    return new DrawData{{this->nodeSize, this->nodeSize}, {x, y}, nullptr};
 }
 
 bool Snake::getStatus() {
     return this->isAlive;
-}
-
-void Snake::grow() {
-    this->length++;
 }
 
 void Snake::turn(char direction) {
@@ -70,24 +109,26 @@ void Snake::turn(char direction) {
 void Snake::update() {
     // create new head, then remove the last node unless the snake needs to grow
     // first, find the new x and y
+    DrawData* head = this->data.getData();
+    int pos[2] = {head->pos[0], head->pos[1]};
     int x;
     int y;
     switch (this->direction) {
     case 'r': // right
-        x = this->head->x + this->nodeSize;
-        y = this->head->y;
+        x = pos[0] + this->nodeSize;
+        y = pos[1];
         break;
     case 'l': // left
-        x = this->head->x - this->nodeSize;
-        y = this->head->y;
+        x = pos[0] - this->nodeSize;
+        y = pos[1];
         break;
     case 'd': // down
-        y = this->head->y + this->nodeSize;
-        x = this->head->x;
+        y = pos[1] + this->nodeSize;
+        x = pos[0];
         break;
     case 'u': // up
-        y = this->head->y - this->nodeSize;
-        x = this->head->x;
+        y = pos[1] - this->nodeSize;
+        x = pos[0];
         break;
     }
 
@@ -99,18 +140,19 @@ void Snake::update() {
     }
     
     // check for food
-    bool foundFood = x == this->food->x && y == this->food->y;
+    bool foundFood = x == this->food->pos[0] && y == this->food->pos[1];
     if (foundFood) {
-        this->grow();
+        this->length++;
         this->food = this->makeFood();
     }
     
     // check collisions
     // iterate every other node in order to store previous node for likely removal later
-    SnakeNode* prev = this->head;
-    SnakeNode* curr = prev->next;
-    for (int i = 2; i < this->currLength; i += 2) {
-        bool collision = (x == curr->x && y == curr->y) || (x == prev->x && y == prev->y);
+    DrawData* prev = head;
+    DrawData* curr = prev->next;
+    int len = this->data.getLength();
+    for (int i = 2; i < this->data.getLength(); i += 2) {
+        bool collision = (x == curr->pos[0] && y == curr->pos[1]) || (x == prev->pos[0] && y == prev->pos[1]);
         if (collision) { 
             this->isAlive = false;
             return;
@@ -119,8 +161,8 @@ void Snake::update() {
         curr = prev->next;
     }
     // if length is uneven, we've missed one
-    if (this->currLength % 2 == 1) {
-        bool collision = x == prev->x && y == prev->y;
+    if (len % 2 == 1) {
+        bool collision = x == prev->pos[0] && y == prev->pos[1];
         if (collision) { 
             this->isAlive = false;
             return;
@@ -128,13 +170,12 @@ void Snake::update() {
     }
 
     // create newNode and make it the head of the list
-    SnakeNode* newHead = new SnakeNode {x, y, this->head};
-    this->head = newHead;
-    this->currLength++;
+    DrawData* newHead = new DrawData {{this->nodeSize, this->nodeSize}, {x, y}, head};
+    this->data.insertAtHead(newHead);
 
     // if the snake shouldn't grow -> remove the last node
-    if (this->currLength > this->length) {
-        prev->next = nullptr;
-        this->currLength--;
+    if (this->data.getLength() > this->length) {
+        this->data.cut(this->data.getLength());
     }
+    this->getData();
 }
