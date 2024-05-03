@@ -54,20 +54,24 @@ void Game::run() {
         SDL_RenderClear(this->ren);
 
         // draw snake
-        SDL_SetRenderDrawColor(this->ren, 255, 255, 255, 255);
         SDL_Rect rect {0, 0, snakeSize, snakeSize};
 
-        DataList data = snake.getData();
-        DrawData* curr = data.getData();
-        int len = data.getLength();
+        RenderData renData = snake.getData();
+        DrawData* drawData = renData.getHead();
+        int renLen = renData.getLength();
 
-        for (int i = 0; i < len; i++) {
-            rect.x = curr->pos[0];
-            rect.y = curr->pos[1];
-            SDL_RenderDrawRect(this->ren, &rect);
-            if (curr->next != nullptr) {
-                curr = curr->next;
+        for (int i = 0; i < renLen; i++) {
+            Color c = drawData->getColor();
+            SDL_SetRenderDrawColor(this->ren, c.r, c.g, c.b, c.a);
+            int drawLen = drawData->getLength();
+            DrawDataItem* drawItem = drawData->getHead();
+            for (int j = 0; j < drawLen; j++) {
+                rect.x = drawItem->pos[0];
+                rect.y = drawItem->pos[1];
+                SDL_RenderDrawRect(this->ren, &rect);
+                drawItem = drawItem->next;
             }
+            drawData = drawData->next;
         }
 
         // present

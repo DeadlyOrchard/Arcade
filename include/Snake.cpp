@@ -2,61 +2,106 @@
 #include <time.h>
 #include <iostream>
 
-DataList::DataList(DrawData* head, int length) {
-    this->length = length;
-    this->head = new DrawData{{head->dim[0], head->dim[1]}, {head->pos[0], head->pos[1]}, nullptr};
-    DrawData* curr = this->head;
-    DrawData* temp = head;
+DrawData::DrawData(DrawDataItem* head, int length, Color c, DrawData* next) {
+    this->drawLen = length;
+    this->drawHead = new DrawDataItem{{head->dim[0], head->dim[1]}, {head->pos[0], head->pos[1]}, nullptr};
+    DrawDataItem* curr = this->drawHead;
+    DrawDataItem* temp = head;
     for (int i = 1; i < length; i++) {
         temp = temp->next;
-        curr->next = new DrawData{ {temp->dim[0], temp->dim[1]}, {temp->pos[0], temp->pos[1]}, nullptr };
+        curr->next = new DrawDataItem{ {temp->dim[0], temp->dim[1]}, {temp->pos[0], temp->pos[1]}, nullptr };
         curr = curr->next;
     }
+    this->color = c;
 }
 
-DataList::DataList() {
-    this->length = 0;
-    this->head = nullptr;
+DrawData::DrawData() {
+    this->drawHead = nullptr;
+    this->drawLen = 0;
 }
 
-int DataList::getLength() {
-    return this->length;
+int DrawData::getLength() { return this->drawLen; }
+
+DrawDataItem* DrawData::getHead() { return this->drawHead; }
+
+Color DrawData::getColor() { return this->color; }
+
+void DrawData::setColor(Color c) {
+    this->color = c;
 }
 
-DrawData* DataList::getData() {
-    return this->head;
+void DrawData::insertAtHead(DrawDataItem* d) {
+    DrawDataItem* newHead = new DrawDataItem{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, this->drawHead };
+    this->drawHead = newHead;
+    this->drawLen++;
 }
 
-void DataList::insertAtHead(DrawData* d) {
-    DrawData* newHead = new DrawData{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, this->head };
-    this->head = newHead;
-    this->length++;
-}
-
-void DataList::append(DrawData* d) {
-    DrawData* curr = this->head;
-    for (int i = 0; i < this->length - 1; i++) {
+void DrawData::append(DrawDataItem* d) {
+    DrawDataItem* curr = this->drawHead;
+    for (int i = 0; i < this->drawLen - 1; i++) {
         curr = curr->next;
     }
-    curr->next = new DrawData{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, nullptr };
-    this->length++;
+    curr->next = new DrawDataItem{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, nullptr };
+    this->drawLen++;
 }
 
-void DataList::cut(int i) {
-    DrawData* curr = this->head;
+void DrawData::cut(int i) {
+    DrawDataItem* curr = this->drawHead;
+    std::cout << i << std::endl;
     for (int j = 0; j < i - 1; j++) {
         curr = curr->next;
     }
     curr->next = nullptr;
-    this->length--;
+    int diff = this->drawLen - i;
+    this->drawLen -= diff;
+}
+
+RenderData::RenderData(DrawData* head, int length) {
+    this->dataLen = length;
+    this->dataHead = new DrawData(head->getHead(), head->getLength(), head->getColor(), nullptr);
+    DrawData* curr = this->dataHead;
+    DrawData* temp = head;
+    for (int i = 1; i < length; i++) {
+        temp = temp->next;
+        curr->next = new DrawData(temp->getHead(), temp->getLength(), temp->getColor(), nullptr);
+        curr = curr->next;
+    }
+    this->next = next;
+}
+
+RenderData::RenderData() {
+    this->dataHead = nullptr;
+    this->dataLen = 0;
+}
+
+int RenderData::getLength() {
+    return this->dataLen;
+}
+
+DrawData* RenderData::getHead() {
+    return this->dataHead;
+}
+
+void RenderData::append(DrawData* d) {
+    DrawData* curr = this->dataHead;
+    for (int i = 0; i < this->dataLen - 1; i++) {
+        curr = curr->next;
+    }
+    DrawDataItem* data = d->getHead();
+    int len = d->getLength();
+    Color c = d->getColor();
+    curr->next = new DrawData(data, len, c, nullptr);
+    this->dataLen++;
 }
 
 Snake::Snake(int length, int nodeSize, char direction, int x, int y, int minX, int minY, int maxX, int maxY) {
     this->nodeSize = nodeSize;
     this->direction = direction;
     this->length = length;
-    DrawData* head = new DrawData{{this->nodeSize, this->nodeSize}, {x, y}, nullptr};
-    this->data = DataList(head, 1);
+    DrawDataItem* head = new DrawDataItem{{this->nodeSize, this->nodeSize}, {x, y}, nullptr};
+    Color c = Color{255, 0, 0, 255};
+    DrawData* body = new DrawData(head, 1, c, nullptr);
+    this->renData = RenderData(body, 1);
     this->bounds[0] = minX;
     this->bounds[1] = minY;
     this->bounds[2] = maxX;
@@ -66,20 +111,22 @@ Snake::Snake(int length, int nodeSize, char direction, int x, int y, int minX, i
     this->food = this->makeFood();
 }
 
-DataList Snake::getData() {
-    DataList d = this->data;
-    d.append(this->food);
-    return d;
+bool Snake::getStatus() { return this->isAlive; }
+
+RenderData Snake::getData() {
+    DrawData f = this->food;
+    RenderData r = this->renData;
+    r.append(&f);
+    return r;
 }
 
-DrawData* Snake::makeFood() {
+DrawData Snake::makeFood() {
     int x = rand() % (this->bounds[2] / this->nodeSize) * this->nodeSize;
     int y = rand() % (this->bounds[3] / this->nodeSize) * this->nodeSize;
-    return new DrawData{{this->nodeSize, this->nodeSize}, {x, y}, nullptr};
-}
-
-bool Snake::getStatus() {
-    return this->isAlive;
+    DrawDataItem* food = new DrawDataItem{{this->nodeSize, this->nodeSize}, {x, y}, nullptr};
+    Color c = Color{0, 0, 255, 255};
+    DrawData d = DrawData(food, 1, c, nullptr);
+    return d;
 }
 
 void Snake::turn(char direction) {
@@ -109,7 +156,8 @@ void Snake::turn(char direction) {
 void Snake::update() {
     // create new head, then remove the last node unless the snake needs to grow
     // first, find the new x and y
-    DrawData* head = this->data.getData();
+    DrawData* body = this->renData.getHead();
+    DrawDataItem* head = body->getHead();
     int pos[2] = {head->pos[0], head->pos[1]};
     int x;
     int y;
@@ -140,7 +188,8 @@ void Snake::update() {
     }
     
     // check for food
-    bool foundFood = x == this->food->pos[0] && y == this->food->pos[1];
+    DrawDataItem* foodPos = this->food.getHead();
+    bool foundFood = x == foodPos->pos[0] && y == foodPos->pos[1];
     if (foundFood) {
         this->length++;
         this->food = this->makeFood();
@@ -148,10 +197,10 @@ void Snake::update() {
     
     // check collisions
     // iterate every other node in order to store previous node for likely removal later
-    DrawData* prev = head;
-    DrawData* curr = prev->next;
-    int len = this->data.getLength();
-    for (int i = 2; i < this->data.getLength(); i += 2) {
+    DrawDataItem* prev = head;
+    DrawDataItem* curr = prev->next;
+    int len = body->getLength();
+    for (int i = 2; i < body->getLength(); i += 2) {
         bool collision = (x == curr->pos[0] && y == curr->pos[1]) || (x == prev->pos[0] && y == prev->pos[1]);
         if (collision) { 
             this->isAlive = false;
@@ -170,12 +219,11 @@ void Snake::update() {
     }
 
     // create newNode and make it the head of the list
-    DrawData* newHead = new DrawData {{this->nodeSize, this->nodeSize}, {x, y}, head};
-    this->data.insertAtHead(newHead);
+    DrawDataItem* newHead = new DrawDataItem {{this->nodeSize, this->nodeSize}, {x, y}, head};
+    body->insertAtHead(newHead);
 
     // if the snake shouldn't grow -> remove the last node
-    if (this->data.getLength() > this->length) {
-        this->data.cut(this->data.getLength());
+    if (body->getLength() > this->length) {
+        body->cut(this->length);
     }
-    this->getData();
 }
