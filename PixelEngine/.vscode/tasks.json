@@ -1,0 +1,32 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cppbuild",
+			"label": "Build with g++ and link SDL2",
+			"command": "c:\\DevDependencies\\msys64\\ucrt64\\bin\\g++.exe",
+			"args": [
+				"-fdiagnostics-color=always",
+				"-g",
+				"${workspaceFolder}\\PixelEngine.cpp",
+				"-I${workspaceFolder}\\include", // custom
+				"-IC:\\DevDependencies\\SDL2-2.30.2-x86_64-w64-mingw32\\include", // core SDL2
+
+				// link everything
+				"-LC:\\DevDependencies\\SDL2-2.30.2-x86_64-w64-mingw32\\lib", // core SDL2
+				"-LC:\\DevDependencies\\SDL2_ttf-2.22.0-x86_64-w64-mingw32\\lib", // SDL2 text
+				"-Wall",
+				"-Wextra",
+				"-lmingw32",
+				"-lSDL2main",
+				"-lSDL2",
+				"-lSDL2_ttf",
+				"${workspaceFolder}\\include\\*.cpp",
+				"-o",
+				"${workspaceFolder}\\bin\\main_g++.exe",
+			],
+			"group": "build",
+			"detail": "compiler: c:\\DevDependencies\\msys64\\ucrt64\\bin\\g++.exe"
+		},
+	]
+}

@@ -3,63 +3,62 @@
 #include <iostream>
 
 DrawData::DrawData(DrawDataItem* head, int length, Color c, DrawData* next) {
-    this->drawLen = length;
-    this->drawHead = new DrawDataItem{{head->dim[0], head->dim[1]}, {head->pos[0], head->pos[1]}, nullptr};
-    DrawDataItem* curr = this->drawHead;
+    this->len = length;
+    this->head = new DrawDataItem{{head->dim[0], head->dim[1]}, {head->pos[0], head->pos[1]}, nullptr};
+    DrawDataItem* curr = this->head;
     DrawDataItem* temp = head;
     for (int i = 1; i < length; i++) {
         temp = temp->next;
         curr->next = new DrawDataItem{ {temp->dim[0], temp->dim[1]}, {temp->pos[0], temp->pos[1]}, nullptr };
         curr = curr->next;
     }
+    this->next = next;
     this->color = c;
 }
 
 DrawData::DrawData() {
-    this->drawHead = nullptr;
-    this->drawLen = 0;
+    this->head = nullptr;
+    this->len = 0;
 }
 
-int DrawData::getLength() { return this->drawLen; }
-
-DrawDataItem* DrawData::getHead() { return this->drawHead; }
-
+// getters
+int DrawData::getLength() { return this->len; }
+DrawDataItem* DrawData::getHead() { return this->head; }
 Color DrawData::getColor() { return this->color; }
 
+// setter
 void DrawData::setColor(Color c) {
     this->color = c;
 }
 
+// mutators
 void DrawData::insertAtHead(DrawDataItem* d) {
-    DrawDataItem* newHead = new DrawDataItem{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, this->drawHead };
-    this->drawHead = newHead;
-    this->drawLen++;
+    DrawDataItem* newHead = new DrawDataItem{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, this->head };
+    this->head = newHead;
+    this->len++;
 }
-
 void DrawData::append(DrawDataItem* d) {
-    DrawDataItem* curr = this->drawHead;
-    for (int i = 0; i < this->drawLen - 1; i++) {
+    DrawDataItem* curr = this->head;
+    for (int i = 0; i < this->len - 1; i++) {
         curr = curr->next;
     }
     curr->next = new DrawDataItem{ {d->dim[0], d->dim[1]}, {d->pos[0], d->pos[1]}, nullptr };
-    this->drawLen++;
+    this->len++;
 }
-
 void DrawData::cut(int i) {
-    DrawDataItem* curr = this->drawHead;
-    std::cout << i << std::endl;
+    DrawDataItem* curr = this->head;
     for (int j = 0; j < i - 1; j++) {
         curr = curr->next;
     }
     curr->next = nullptr;
-    int diff = this->drawLen - i;
-    this->drawLen -= diff;
+    int diff = this->len - i;
+    this->len -= diff;
 }
 
 RenderData::RenderData(DrawData* head, int length) {
-    this->dataLen = length;
-    this->dataHead = new DrawData(head->getHead(), head->getLength(), head->getColor(), nullptr);
-    DrawData* curr = this->dataHead;
+    this->len = length;
+    this->head = new DrawData(head->getHead(), head->getLength(), head->getColor(), nullptr);
+    DrawData* curr = this->head;
     DrawData* temp = head;
     for (int i = 1; i < length; i++) {
         temp = temp->next;
@@ -70,28 +69,29 @@ RenderData::RenderData(DrawData* head, int length) {
 }
 
 RenderData::RenderData() {
-    this->dataHead = nullptr;
-    this->dataLen = 0;
+    this->head = nullptr;
+    this->len = 0;
 }
 
+// getters
 int RenderData::getLength() {
-    return this->dataLen;
+    return this->len;
 }
-
 DrawData* RenderData::getHead() {
-    return this->dataHead;
+    return this->head;
 }
 
+// mutators
 void RenderData::append(DrawData* d) {
-    DrawData* curr = this->dataHead;
-    for (int i = 0; i < this->dataLen - 1; i++) {
+    DrawData* curr = this->head;
+    for (int i = 0; i < this->len - 1; i++) {
         curr = curr->next;
     }
     DrawDataItem* data = d->getHead();
     int len = d->getLength();
     Color c = d->getColor();
     curr->next = new DrawData(data, len, c, nullptr);
-    this->dataLen++;
+    this->len++;
 }
 
 Snake::Snake(int length, int nodeSize, char direction, int x, int y, int minX, int minY, int maxX, int maxY) {

@@ -15,8 +15,8 @@ struct DrawDataItem {
 
 class DrawData {
 private:
-    DrawDataItem* drawHead;
-    int drawLen;
+    DrawDataItem* head;
+    int len;
     Color color;
 public:
     DrawData(DrawDataItem* head, int length, Color c, DrawData* next);
@@ -36,8 +36,8 @@ public:
 
 class RenderData {
 private:
-    DrawData* dataHead;
-    int dataLen;
+    DrawData* head;
+    int len;
     DrawData* next;
 public:
     RenderData(DrawData* head, int length);
