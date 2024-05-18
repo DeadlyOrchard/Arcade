@@ -1,17 +1,26 @@
-# Repository Purpose
-- I'll be writing little arcade games using the gcc compiler and SDL2 libraries. The games will be created individually and then built into one executable.
-- One major goal for this project is to make all of it from scratch save for the graphics library, SDL2.
-  - That means writing my own memory management for basically the entire project so keep that in mind if you're thinking of installing. 
-- The first game to be added to the arcade is Snake
+# General
+- Goal: an arcade cabinet program
+- In the works:
+  - Snake Game
+- Tools
+  - GNU compilers GCC and G++
+  - [ SDL2 Library ](https://github.com/libsdl-org/SDL/releases/tag/release-2.30.2)
+    - [SDL2_ttf Library ](https://github.com/libsdl-org/SDL_ttf/releases/tag/release-2.22.0)
+  - [ Flecs Framework ](https://github.com/SanderMertens/flecs)
 
 ## Build/Compile Instructions
-- As of 5/02/2024,
-- `${compiler_loc} -g ${workspaceFolder}\main.cpp -I ${SDL2_mingw32_dir}\include -L ${SDL2_mingw32_dir}\lib -lmingw32 -lSDL2main -lSDL2 ${workspaceFolder}\include\*.cpp -o ${out}\main.exe`
-- Where
-  - `{compiler_loc}` is the location of the c++ compiler,
-    - Note: best to use g++ compiler to avoid linker errors.
-  - `{workspaceFolder}` is the location of the overall application folder,
-  - `{SDL_mingw32_dir}` is the location of the SDL2 library built for mingw32,
-    - After downloading [ SDL2-devel-2.30.2-mingw.zip ](https://github.com/libsdl-org/SDL/releases/tag/release-2.30.2),
-    - Use the location of the subfolder, "x86_64-w64-mingw32" for this path.
-  - `{out}` is the location of the folder where the executable will be built.
+- As of 5/18/2024,
+  - The flecs framework is already in the include directory, but the SDL2 and SDL2_ttf library must be installed.
+    - In building this project, I'm using: 
+      - `SDL2-devel-2.30.2-win32-x86.zip` from the SDL2 release linked above. 
+      - `SDL2_ttf-devel-2.22.0-win32-x64.zip` from the SDL2_ttf release linked above.
+  - On Windows, 
+    - After cloning the repo, the file `.\Arcade\src\build.bat` will do most of the heavy lifting. There are two changes that need to be done.
+      - In `.\Arcade\src\build.bat`,
+        - Assign SDL2 (line 15) with the absolute path to SDL2 on your system
+        - Assign SDL2_ttf (line 16) with the absolute path to SDL2_ttf on your system
+    - Then, navigate to `.\Arcade` in the terminal and run `.\src\build.bat`.
+    - After supplying the `.\Arcade\bin` with the necessary `.dll` files,
+      - `SDL2.dll`
+      - `SDL2_ttf.dll`
+    - `.\Arcade\bin\application.exe` should be ready!

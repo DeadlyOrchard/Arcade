@@ -1,50 +1,70 @@
 #include "Snake.hpp"
+#include "Arcade.hpp"
 
-Snake::Snake(flecs::world* ecs, int screenWidth, int screenHeight, int nodeSize, std::string basePath) {
-    // drawing constants
-    _width = screenWidth;
-    _height = screenHeight;
-    _wCenter = _width / 2;
-    _hCenter = _height / 2;
+Snake::Snake(SDL_Renderer* ren, flecs::world* ecs, int screenWidth, int screenHeight, int nodeSize, std::string basePath) :
+Scene(ren, ecs, screenWidth, screenHeight, basePath) {
+    // set up RenderData struct with local coordinates for one node
     _nodeSize = nodeSize;
-    // snake entities
-    _data = ecs->entity()
-        .set<GameData>({"Snake", time(0), -1, 1});
-    Position startingPos = {_wCenter, _hCenter};
-    _head = ecs->entity()
-        .set<Position>(startingPos)
-        .set<Velocity>({1, 0});
-    _body = ecs->entity()
-        .set<Body>({{startingPos}, true})
-        .set<Text>({"1", 18, {20, 20}});
-    srand(time(0));
-    int xFood = (rand() % (_width / _nodeSize)) * _nodeSize;
-    int yFood = (rand() % (_height / _nodeSize)) * _nodeSize;
-    _food = ecs->entity()
-        .set<Position>({xFood, yFood});
+    float fNodeSize = (float)_nodeSize;
+    SDL_FPoint localCoords[6] = {
+        {0, 0}, {fNodeSize, 0}, {0, fNodeSize},
+        {fNodeSize, fNodeSize}, {fNodeSize, 0}, {0, fNodeSize}
+    };
+    SDL_Vertex v;
+    v.color = { 0 };
+    v.tex_coord = { 0 };
+    std::vector<SDL_Vertex> nodeObj;
+    for (SDL_FPoint localPoint : localCoords) {
+        v.position = localPoint;
+        nodeObj.push_back(v);
+    }
+    _nodeLocal = {nullptr, nodeObj};
 
-    // game over entities
-    _gameOver = ecs->entity();
-    int lineHeight;
-    _fontPath = (basePath + "PressStart.ttf").data();
-    TTF_Font* font = TTF_OpenFont(_fontPath, 24);
-    TTF_SizeText(font, "A", nullptr, &lineHeight);
-    int linePadding = lineHeight / 2;
-    Position gameOverPos = {_wCenter, _hCenter};
-    Position playAgainPos = {_wCenter, _hCenter + lineHeight + linePadding};
-    Position spacebarPos = {_wCenter, _hCenter + (lineHeight * 2) + (linePadding * 2)};
-    ecs->entity()
-        .child_of(_gameOver)
-        .set<Text>({"Game Over", 24, gameOverPos})
-        .disable();
-    ecs->entity()
-        .child_of(_gameOver)
-        .set<Text>({"Play Again?", 24, playAgainPos})
-        .disable();
-    ecs->entity()
-        .child_of(_gameOver)
-        .set<Text>({"[SPACEBAR]", 14, spacebarPos})
-        .disable();
+    // snake entities
+    Position startingPos = {_wCenter, _hCenter};
+    Text scoreText = {"1", OFF_WHITE, 18, {20, 20}};
+    RenderData scoreData = createRenderDataFromText(scoreText);
+    _head = ecs->entity()
+        .set<Text>(scoreText)
+        .set<Position>(startingPos)
+        .set<Velocity>({1, 0})
+        .child_of(_data);
+    _score = ecs->entity()
+        .set<RenderData>(scoreData)
+        .child_of(_display);
+    _body = ecs->entity()
+        .set<Body>({{startingPos}, 1, true})
+        .set<RenderData>(_nodeLocal)
+        .child_of(_display);
+    srand(time(0));
+    Position newFoodPos = {
+        (rand() % (_width / _nodeSize)) * _nodeSize,
+        (rand() % (_height / _nodeSize)) * _nodeSize,
+    };
+    _food = ecs->entity()
+        .set<Position>(newFoodPos);
+}
+
+void Snake::reset() const {
+    Position *pos = _head.get_mut<Position>();
+    Position startingPos = {_wCenter, _hCenter};
+    *pos = startingPos;
+    Velocity *vel = _head.get_mut<Velocity>();
+    Velocity startingVel = {1, 0};
+    *vel = startingVel;
+    Text *score = _head.get_mut<Text>();
+    score->text = "1";
+    Body *body = _body.get_mut<Body>();
+    body->alive = true;
+    body->list.clear();
+    body->list.push_back(startingPos);
+    body->length = 1;
+    Position newFoodPos = {
+        (rand() % (_width / _nodeSize)) * _nodeSize,
+        (rand() % (_height / _nodeSize)) * _nodeSize,
+    };
+    Position *foodPos = _food.get_mut<Position>();
+    *foodPos = newFoodPos;
 }
 
 void Snake::exec(int in) const {
@@ -69,7 +89,7 @@ void Snake::exec(int in) const {
         break;
     }
     // snake can only go vertical if currently moving horizontal and vice versa
-    if ((v->x != 0 && vel.y != 0) || (v->y != 0 && vel.x != 0)) {
+    if ((v->x != 0 && vel.x == 0) || (v->y != 0 && vel.y == 0)) {
         *v = vel;
     }
 }
@@ -78,7 +98,6 @@ void Snake::update() const {
     Position *pos = _head.get_mut<Position>();
     const Velocity *vel = _head.get<Velocity>();
     Body *body = _body.get_mut<Body>();
-    GameData *data = _data.get_mut<GameData>();
     Position nextPos = {pos->x + _nodeSize * vel->x, pos->y + _nodeSize * vel->y};
     // check for walls
     if (nextPos.x >= _width || nextPos.x < 0 || nextPos.y >= _height || nextPos.y < 0) {
@@ -90,8 +109,8 @@ void Snake::update() const {
         // move the food
         foodPos->x = (rand() % (_width / _nodeSize)) * _nodeSize;
         foodPos->y = (rand() % (_height / _nodeSize)) * _nodeSize;
-        data->score++; // update game data
-        _body.get_mut<Text>()->text = std::to_string(data->score); // update UI
+        body->length++; // update game data
+        _head.get_mut<Text>()->text = std::to_string(body->length).data(); // update UI
     }
     // check for collision with self
     for (Position node : body->list) {
@@ -107,71 +126,73 @@ void Snake::update() const {
     pos->y = nextPos.y;
     body->list.insert(body->list.begin(), nextPos);
     // remove last if snake too long
-    if (body->list.size() > data->score) {
+    if (body->list.size() > body->length) {
         body->list.pop_back();
     }
 }
 
-void Snake::restart() const {
-    Position *pos = _head.get_mut<Position>();
-    Position startingPos = {_wCenter, _hCenter};
-    *pos = startingPos;
-    Velocity *vel = _head.get_mut<Velocity>();
-    Velocity startingVel = {1, 0};
-    *vel = startingVel;
-    Body *body = _body.get_mut<Body>();
-    body->alive = true;
-    body->list.clear();
-    body->list.push_back(startingPos);
-    GameData *data = _data.get_mut<GameData>();
-    data->start = time(0);
-    data->end = -1;
-    data->score = 1;
-    _gameOver.children([](flecs::entity child) {
-        child.disable();
-    });
-}
-
-void Snake::end() const {
-    GameData *data = _data.get_mut<GameData>();
-    data->end = time(0);
-    _gameOver.children([](flecs::entity child) {
-        child.enable();
-    });
-}
-
-std::vector<SDL_Vertex> Snake::getRenderData() const {
-    std::vector<SDL_Vertex> obj;
+void Snake::renderUpdate() const {
     const Body *body = _body.get<Body>();
-    SDL_Color color = {0, 155, 0, 255};
-    SDL_Vertex v;
-    v.color = color;
-    v.tex_coord = SDL_FPoint{ 0 };
     // local coordinates
-    Position local[6] = {
-        {0, 0}, {_nodeSize, 0}, {0, _nodeSize},
-        {_nodeSize, _nodeSize}, {_nodeSize, 0}, {0, _nodeSize} };
+    SDL_Vertex globalVert = _nodeLocal.obj[0];
+    globalVert.color = GREEN;
+    globalVert.tex_coord = { 0 };
+    std::vector<SDL_Vertex> obj;
+    // calc global coords
     for (Position node : body->list) {
-        Position origin = {node.x, node.y};
-        for (Position pos : local) {
-            v.position.x = origin.x + pos.x;
-            v.position.y = origin.y + pos.y;
-            obj.push_back(v);
+        for (SDL_Vertex localVert : _nodeLocal.obj) {
+            globalVert.position.x = node.x + localVert.position.x;
+            globalVert.position.y = node.y + localVert.position.y;
+            obj.push_back(globalVert);
         }
     }
-    color = {155, 0, 0, 255};
-    v.color = color;
+    // same for food
+    globalVert.color = RED;
     const Position *foodPos = _food.get<Position>();
     Position origin = {foodPos->x, foodPos->y};
-    for (Position pos : local) {
-        v.position.x = origin.x + pos.x;
-        v.position.y = origin.y + pos.y;
-        obj.push_back(v);
+    for (SDL_Vertex localVert : _nodeLocal.obj) {
+        globalVert.position.x = origin.x + localVert.position.x;
+        globalVert.position.y = origin.y + localVert.position.y;
+        obj.push_back(globalVert);
     }
-    return obj;
+    // dynamic text needs to be turned into render data
+    const Text *score = _head.get<Text>();
+
+    // swap out the data
+    RenderData *renBody = _body.get_mut<RenderData>();
+    RenderData *renScore = _score.get_mut<RenderData>();
+    *renBody = { nullptr, obj };
+    SDL_Texture *old = renScore->tex;
+    *renScore = createRenderDataFromText(*score);
 }
 
-bool Snake::isAlive() const {
+bool Snake::isGameOver() const {
     const Body *body = _body.get<Body>();
-    return body->alive;
+    return !body->alive;
+}
+
+SnakeGame::SnakeGame(SDL_Renderer *ren, flecs::world *ecs, int screenWidth, int screenHeight, int nodeSize, std::string basePath) :
+    Game(ren, ecs, {
+        new Snake(ren, ecs, screenWidth, screenHeight, nodeSize, basePath),
+        new GameOver(ren, ecs, screenWidth, screenHeight, basePath)
+    }) {
+}
+
+void SnakeGame::update() const {
+    SceneManager *sm = _sceneManager.get_mut<SceneManager>();
+    if (sm->scenes[sm->current]->isGameOver()) {
+        switch (sm->current) {
+        case 0:
+            setScene(1);
+            break;
+        case 1:
+            setScene(0);
+            break;
+        }
+    }
+}
+
+void SnakeGame::exec(int in) const {
+    const SceneManager *sm = _sceneManager.get<SceneManager>();
+    sm->scenes[sm->current]->exec(in);
 }
