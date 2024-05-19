@@ -12,21 +12,37 @@ Scene::Scene(SDL_Renderer *ren, flecs::world *ecs, int screenWidth, int screenHe
     _font = (basePath + "PressStart.ttf");
 }
 
-RenderData Scene::createRenderDataFromText(Text t) const {
+RenderData Scene::createRenderDataFromText(Text t, char alignment) const {
     SDL_Rect iRect = {t.pos.x, t.pos.y, 0, 0};
     TTF_Font* font = TTF_OpenFont(_font.data(), t.fontSize);
     TTF_SizeText(font, t.text.data(), &iRect.w, &iRect.h);
     SDL_FRect fRect = {(float)iRect.x, (float)iRect.y, (float)iRect.w, (float)iRect.h};
     SDL_Surface *surf = TTF_RenderText_Solid(font, t.text.data(), t.fontColor);
     SDL_Texture *tex = SDL_CreateTextureFromSurface(_ren, surf);
-    std::vector<SDL_Vertex> obj = {
-        {{fRect.x, fRect.y}, WHITE, {0, 0}}, // top left
-        {{fRect.x + fRect.w, fRect.y}, WHITE, {1, 0}}, // top right
-        {{fRect.x, fRect.y + fRect.h}, WHITE, {0, 1}}, // bottom left
-        {{fRect.x + fRect.w, fRect.y + fRect.h}, WHITE, {1, 1}}, // bottom right
-        {{fRect.x + fRect.w, fRect.y}, WHITE, {1, 0}}, // top right
-        {{fRect.x, fRect.y + fRect.h}, WHITE, {0, 1}} // bottom left
-    };
+    std::vector<SDL_Vertex> obj;
+    switch(alignment) {
+    case 'l': // left
+        obj = {
+            {{fRect.x, fRect.y}, WHITE, {0, 0}}, // top left
+            {{fRect.x + fRect.w, fRect.y}, WHITE, {1, 0}}, // top right
+            {{fRect.x, fRect.y + fRect.h}, WHITE, {0, 1}}, // bottom left
+            {{fRect.x + fRect.w, fRect.y + fRect.h}, WHITE, {1, 1}}, // bottom right
+            {{fRect.x + fRect.w, fRect.y}, WHITE, {1, 0}}, // top right
+            {{fRect.x, fRect.y + fRect.h}, WHITE, {0, 1}} // bottom left
+        };
+        break;
+    case 'r': // right
+        // same as left, but subtract fRect.w from each x coordinate
+        obj = {
+            {{fRect.x - fRect.w, fRect.y}, WHITE, {0, 0}}, // top left
+            {{fRect.x, fRect.y}, WHITE, {1, 0}}, // top right
+            {{fRect.x - fRect.w, fRect.y + fRect.h}, WHITE, {0, 1}}, // bottom left
+            {{fRect.x, fRect.y + fRect.h}, WHITE, {1, 1}}, // bottom right
+            {{fRect.x, fRect.y}, WHITE, {1, 0}}, // top right
+            {{fRect.x - fRect.w, fRect.y + fRect.h}, WHITE, {0, 1}} // bottom left
+        };
+        break;
+    }
     TTF_CloseFont(font);
     SDL_FreeSurface(surf);
     return RenderData{tex, obj};
@@ -44,120 +60,112 @@ void Scene::deactivate() const {
     });
 }
 
-GameOver::GameOver(SDL_Renderer* ren, flecs::world* ecs, int screenWidth, int screenHeight, std::string basePath) :
-Scene(ren, ecs, screenWidth, screenHeight, basePath) {
-    _defaultColor = OFF_WHITE;
-    _selectedColor = WHITE;
-    
-    // input component
-    _input = ecs->entity()
-        .set<OptionSelect>({0, 2, false})
-        .child_of(_data);
+Menu::Menu(SDL_Renderer* ren, flecs::world* ecs, int screenWidth, int screenHeight, std::string basePath, 
+    int fontSize, std::string msg, SDL_Color msgColor, std::vector<std::string> options, SDL_Color defaultColor, SDL_Color selectedColor) :
+    Scene(ren, ecs, screenWidth, screenHeight, basePath) {
+    _defaultColor = defaultColor;
+    _selectedColor = selectedColor;
     
     // get vals to calc spacing
     int lineHeight;
-    TTF_Font* font = TTF_OpenFont(_font.data(), 24);
+    TTF_Font* font = TTF_OpenFont(_font.data(), 18);
     TTF_SizeText(font, "A", nullptr, &lineHeight);
     TTF_CloseFont(font);
     int linePadding = lineHeight / 2;
     // calc spacing
     int padding = 20;
-    Position optionPos[2];
+    std::vector<Position> posOpts;
+
     Position msgPos = {padding, padding};
-    for (int i = 1; i < 3; i++) { // start at one because we already did one (msgPos)
-        optionPos[i - 1] = {padding, padding + lineHeight * i + linePadding * i};
+    for (int i = 1; i <= options.size(); i++) { // start at one because we already did one (msgPos)
+        posOpts.push_back({padding, padding + lineHeight * i + linePadding * i});
     }
-    // save positions for potential .restart()
-    for (int i = 0; i < 2; i++) {
-        _optionData[i] = ecs->entity()
-            .set<Position>(optionPos[i])
-            .child_of(_data);
-    }
+
     // create Text components
-    Text msgT = {"Game Over", RED, 24, msgPos};
-    Text optionT[2];
-    std::string optionMsg[2] = {"New Game", "Game Select"};
-    for (int i = 0; i < 2; i++) {
-        optionT[i] = {optionMsg[i], _defaultColor, 18, optionPos[i]};
+    std::vector<Text> textOpts;
+    for (int i = 0; i < options.size(); ++i) {
+        textOpts.push_back({options[i], _defaultColor, fontSize, posOpts[i]});
     }
+    
+    // input component
+    _input = ecs->entity()
+        .set<OptionSelect>({0, textOpts, false})
+        .child_of(_data);
+
     // create RenderData components
-    RenderData optionD[2];
-    RenderData msgD = createRenderDataFromText(msgT);
-    for (int i = 0; i < 2; i++) {
-        optionD[i] = createRenderDataFromText(optionT[i]);
+    std::vector<RenderData> dataOpts;
+    RenderData dataPrompt = createRenderDataFromText({msg, msgColor, fontSize, msgPos}, 'l');
+    for (int i = 0; i < options.size(); i++) {
+        dataOpts.push_back(createRenderDataFromText(textOpts[i], 'l'));
     }
-    // save them to entities
+
+    // give components to entities
     ecs->entity()
-        .set<RenderData>(msgD)
+        .set<RenderData>(dataPrompt)
         .child_of(_display);
-    for (int i = 0; i < 2; i++) {
-        _optionDisplay[i] = ecs->entity()
-            .set<RenderData>(optionD[i])
-            .set<Text>(optionT[i])
-            .child_of(_display);
+    for (int i = 0; i < dataOpts.size(); i++) {
+        _optionDisplay.push_back(ecs->entity()
+            .set<RenderData>(dataOpts[i])
+            .set<Text>(textOpts[i])
+            .child_of(_display));
     }
 }
 
-void GameOver::reset() const {
-    std::string optionMsg[2] = {"New Game", "Game Select"};
-    for (int i = 0; i < 2; i++) {
-        const Position *optionPos = _optionData[i].get<Position>();
-        Text optionT = {optionMsg[i], _defaultColor, 18, *optionPos};
-        RenderData optionD = createRenderDataFromText(optionT);
+void Menu::reset() const {
+    OptionSelect *optSelect = _input.get_mut<OptionSelect>();
+    for (int i = 0; i < optSelect->options.size(); ++i) {
+        RenderData dataOpt = createRenderDataFromText(optSelect->options[i], 'l');
         RenderData *option = _optionDisplay[i].get_mut<RenderData>();
-        *option = optionD;
+        *option = dataOpt;
     }
-    OptionSelect *inData = _input.get_mut<OptionSelect>();
-    inData->finished = false;
+    optSelect->finished = false;
 }
 
-void GameOver::update() const {
-    // no game logic
-}
+void Menu::update() const {} // no game logic to execute for menus
 
-void GameOver::renderUpdate() const {
-    const OptionSelect *selection = _input.get<OptionSelect>();
-    for (int i = 0; i < 2; ++i) {
+void Menu::renderUpdate() const {
+    const OptionSelect *optSelect = _input.get<OptionSelect>();
+    for (int i = 0; i < optSelect->options.size(); ++i) {
         Text *t = _optionDisplay[i].get_mut<Text>();
         RenderData *d = _optionDisplay[i].get_mut<RenderData>();
-        if (i == selection->selected) {
-            t->fontColor = WHITE;
+        if (i == optSelect->selected) {
+            t->fontColor = _selectedColor;
         } else {
-            t->fontColor = OFF_WHITE;
+            t->fontColor = _defaultColor;
         }
         SDL_Texture *old = d->tex;
-        *d = createRenderDataFromText(*t);
+        *d = createRenderDataFromText(*t, 'l');
         SDL_DestroyTexture(old);
     }
 }
 
-void GameOver::exec(int in) const {
+bool Menu::isGameOver() const {
+    const OptionSelect *inData = _input.get<OptionSelect>();
+    return inData->finished;
+}
+
+void Menu::exec(int in) const {
     OptionSelect *inData = _input.get_mut<OptionSelect>();
     if (!inData->finished) {
         switch(in) {
         case SDLK_UP:
         case SDLK_w:
-            inData->selected++;
+            inData->selected--;
             break;
         case SDLK_DOWN:
         case SDLK_s:
-            inData->selected--;
+            inData->selected++;
             break;
         case SDLK_SPACE:
             inData->finished = true;
             break;
         }
-        if (inData->selected == inData->optionsLen) {
+        if (inData->selected == inData->options.size()) {
             inData->selected = 0;
         } else if (inData->selected < 0) {
-            inData->selected = inData->optionsLen - 1;
+            inData->selected = inData->options.size() - 1;
         }
     }
-}
-
-bool GameOver::isGameOver() const {
-    const OptionSelect *inData = _input.get<OptionSelect>();
-    return inData->finished;
 }
 
 Game::Game(SDL_Renderer *ren, flecs::world *ecs, std::vector<Scene*> scenes) {
@@ -178,25 +186,37 @@ Game::Game(SDL_Renderer *ren, flecs::world *ecs, std::vector<Scene*> scenes) {
         });
     _deactivateCurrent.disable();
 
-    // update game logic - ran automatically each OnUpdate phase
-    ecs->system<SceneManager>()
-        .kind(flecs::OnUpdate)
+    // reset current scene - ran manually
+    _resetCurrent = ecs->system()
+        .iter([this](flecs::iter &it) {
+            const SceneManager *sm = _sceneManager.get<SceneManager>();
+            sm->scenes[sm->current]->reset();
+        });
+    _resetCurrent.disable();
+
+    // update game logic - ran manually
+    _sceneUpdate = ecs->system<const SceneManager>()
+        .kind(0)
         .each([](const SceneManager &sm) {
+            std::cout << "Scene update" << '\t';
             sm.scenes[sm.current]->update();
         });
 
     // update render components - ran automatically each PreStore phase
-    ecs->system<SceneManager>()
+    ecs->system<const SceneManager>()
         .kind(flecs::PreStore)
         .each([this](const SceneManager &sm) {
+            std::cout << "Render update" << '\t';
             SDL_SetRenderDrawColor(_ren, 33, 33, 33, 255);
             SDL_RenderClear(_ren);
             sm.scenes[sm.current]->renderUpdate();
         });
 
     // draw all RenderData components - ran manually
-    _renderDraw = ecs->system<RenderData, Active>()
+    _renderDraw = ecs->system<const RenderData, const Active>()
+        .kind(0)
         .each([this](const RenderData &data, const Active &status) {
+            std::cout << "Render draw" << '\t';
             int err = SDL_RenderGeometry(_ren, data.tex, data.obj.data(), data.obj.size(), nullptr, 0);
             if (err != 0) {
                 printf("%s\n", SDL_GetError());
@@ -208,6 +228,7 @@ Game::Game(SDL_Renderer *ren, flecs::world *ecs, std::vector<Scene*> scenes) {
         .kind(flecs::OnStore)
         .iter([this] (flecs::iter &it) {
             _renderDraw.run();
+            std::cout << "Render present" << std::endl;
             SDL_RenderPresent(_ren);
         });
 
@@ -217,12 +238,28 @@ Game::Game(SDL_Renderer *ren, flecs::world *ecs, std::vector<Scene*> scenes) {
     _activateCurrent.run();
 }
 
-void Game::setScene(int index) const {
+void Game::updateScene() const {
+    _sceneUpdate.run();
+}
+
+void Game::deactivateScene() const {
     _deactivateCurrent.run();
-    SceneManager *sm = _sceneManager.get_mut<SceneManager>();
-    if (index >= 0 && index < sm->scenes.size()) {
-        sm->scenes[sm->current]->reset();
-        sm->current = index;
-    }
+}
+
+void Game::activateScene() const {
     _activateCurrent.run();
+}
+
+void Game::resetScene() const {
+    _resetCurrent.run();
+}
+
+void Game::setScene(int i) const {
+    SceneManager *sm = _sceneManager.get_mut<SceneManager>();
+    sm->current = i;
+}
+
+void Game::exec(int in) const {
+    const SceneManager *sm = _sceneManager.get<SceneManager>();
+    sm->scenes[sm->current]->exec(in);
 }

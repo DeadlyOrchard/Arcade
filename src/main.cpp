@@ -36,6 +36,7 @@ int main(int argc, char *argv[]) {
     ecs.system()
         .kind(flecs::OnUpdate)
         .iter([game](flecs::iter &it) {
+            std::cout << "Game update" << '\t';
             game.update();
         });
     

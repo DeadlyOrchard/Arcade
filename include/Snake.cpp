@@ -22,8 +22,9 @@ Scene(ren, ecs, screenWidth, screenHeight, basePath) {
 
     // snake entities
     Position startingPos = {_wCenter, _hCenter};
-    Text scoreText = {"1", OFF_WHITE, 18, {20, 20}};
-    RenderData scoreData = createRenderDataFromText(scoreText);
+    int padding = 20;
+    Text scoreText = {"1", OFF_WHITE, 18, {_width - padding, padding}};
+    RenderData scoreData = createRenderDataFromText(scoreText, 'r');
     _head = ecs->entity()
         .set<Text>(scoreText)
         .set<Position>(startingPos)
@@ -163,7 +164,8 @@ void Snake::renderUpdate() const {
     RenderData *renScore = _score.get_mut<RenderData>();
     *renBody = { nullptr, obj };
     SDL_Texture *old = renScore->tex;
-    *renScore = createRenderDataFromText(*score);
+    *renScore = createRenderDataFromText(*score, 'r');
+    SDL_DestroyTexture(old);
 }
 
 bool Snake::isGameOver() const {
@@ -172,27 +174,27 @@ bool Snake::isGameOver() const {
 }
 
 SnakeGame::SnakeGame(SDL_Renderer *ren, flecs::world *ecs, int screenWidth, int screenHeight, int nodeSize, std::string basePath) :
-    Game(ren, ecs, {
-        new Snake(ren, ecs, screenWidth, screenHeight, nodeSize, basePath),
-        new GameOver(ren, ecs, screenWidth, screenHeight, basePath)
-    }) {
+Game(ren, ecs, {
+    new Snake(ren, ecs, screenWidth, screenHeight, nodeSize, basePath),
+    new Menu(ren, ecs, screenWidth, screenHeight, basePath, 18, "Game Over", RED, {"New Game", "Game Select", "Quit"}, OFF_WHITE, WHITE)
+}) {
 }
 
 void SnakeGame::update() const {
-    SceneManager *sm = _sceneManager.get_mut<SceneManager>();
+    const SceneManager *sm = _sceneManager.get<SceneManager>();
     if (sm->scenes[sm->current]->isGameOver()) {
         switch (sm->current) {
-        case 0:
+        case 0: // the game
             setScene(1);
+            activateScene();
             break;
-        case 1:
+        case 1: // game over menu
+            deactivateScene();
+            resetScene();
             setScene(0);
+            resetScene();
             break;
         }
     }
-}
-
-void SnakeGame::exec(int in) const {
-    const SceneManager *sm = _sceneManager.get<SceneManager>();
-    sm->scenes[sm->current]->exec(in);
+    updateScene();
 }

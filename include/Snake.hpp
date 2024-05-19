@@ -5,6 +5,12 @@
 #include <iostream>
 #include "Arcade.hpp"
 
+struct Body {
+    std::vector<Position> list;
+    int length;
+    bool alive;
+};
+
 class Snake : public Scene {
 private:
     flecs::entity _head, _body, _food, _score;
@@ -19,9 +25,8 @@ public:
     bool isGameOver() const; // returns true if snake dead, false otherwise
 };
 
-class SnakeGame : Game {
+class SnakeGame : public Game {
 public:
     SnakeGame(SDL_Renderer*, flecs::world*, int, int, int, std::string);
-    void exec(int) const;
     void update() const;
 };

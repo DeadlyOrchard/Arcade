@@ -15,12 +15,6 @@ struct Velocity {
     int x, y;
 };
 
-struct Body {
-    std::vector<Position> list;
-    int length;
-    bool alive;
-};
-
 struct Text {
     std::string text;
     SDL_Color fontColor;
@@ -35,15 +29,17 @@ struct RenderData {
 
 struct OptionSelect {
     int selected;
-    int optionsLen;
+    std::vector<Text> options;
     bool finished;
 };
 
-struct UserPaths {
-    char *base, *font;
-};
-
 struct Active {  };
+
+// frequently used colors
+const SDL_Color GREEN {0, 155, 0, 255};
+const SDL_Color RED {155, 0, 0, 255};
+const SDL_Color OFF_WHITE {155, 155, 155, 255};
+const SDL_Color WHITE {255, 255, 255, 255};
 
 class Scene {
 protected:
@@ -52,7 +48,7 @@ protected:
     std::string _base, _font;
     SDL_Renderer* _ren;
     flecs::entity _display, _data;
-    RenderData createRenderDataFromText(Text) const;
+    RenderData createRenderDataFromText(Text, char) const;
 public:
     void activate() const; // give children of _display active tag
     void deactivate() const; // remove active tag from children of _display
@@ -61,22 +57,16 @@ public:
     virtual void renderUpdate() const = 0; // updates RenderData components
     virtual bool isGameOver() const = 0; // returns whether the game is over or not
     virtual void exec(int) const = 0; // execute an input
-    // colors
-    const SDL_Color GREEN {0, 155, 0, 255};
-    const SDL_Color RED {155, 0, 0, 255};
-    const SDL_Color OFF_WHITE {155, 155, 155, 255};
-    const SDL_Color WHITE {255, 255, 255, 255};
 };
 
-class GameOver : public Scene {
+// for easily creating GameOver/Pause screens
+class Menu : public Scene {
 private:
-    SDL_Texture *_backdrop;
     SDL_Color _defaultColor, _selectedColor;
     flecs::entity _input;
-    flecs::entity _optionData[2];
-    flecs::entity _optionDisplay[2];
+    std::vector<flecs::entity> _optionDisplay;
 public:
-    GameOver(SDL_Renderer*, flecs::world*, int, int, std::string);
+    Menu(SDL_Renderer*, flecs::world*, int, int, std::string, int, std::string, SDL_Color, std::vector<std::string>, SDL_Color, SDL_Color);
     void reset() const;
     void update() const;
     void renderUpdate() const;
@@ -90,13 +80,18 @@ struct SceneManager {
 };
 
 class Game {
-protected:
+private:
     SDL_Renderer *_ren;
+    flecs::system _activateCurrent, _deactivateCurrent, _resetCurrent, _sceneUpdate, _renderDraw;
+protected:
     flecs::entity _sceneManager;
-    flecs::system _activateCurrent, _deactivateCurrent, _renderDraw;
+    void updateScene() const;
+    void deactivateScene() const;
+    void activateScene() const;
+    void resetScene() const;
     void setScene(int) const;
 public:
     Game(SDL_Renderer*, flecs::world*, std::vector<Scene*>);
-    virtual void exec(int) const = 0;
+    void exec(int) const;
     virtual void update() const = 0;
 };
