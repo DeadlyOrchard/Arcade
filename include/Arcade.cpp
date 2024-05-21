@@ -6,10 +6,13 @@ Scene::Scene(SDL_Renderer *ren, flecs::world *ecs, int screenWidth, int screenHe
     _wCenter = _width / 2;
     _hCenter = _height / 2;
     _ren = ren;
-    _display = ecs->entity();
-    _data = ecs->entity();
     _base = basePath;
     _font = (basePath + "PressStart.ttf");
+    _display = ecs->entity();
+    _data = ecs->entity();
+    _status = ecs->entity()
+        .child_of(_data)
+        .set<SceneStatus>({false, false, 0});
 }
 
 RenderData Scene::createRenderDataFromText(Text t, char alignment) const {
@@ -48,6 +51,45 @@ RenderData Scene::createRenderDataFromText(Text t, char alignment) const {
     return RenderData{tex, obj};
 }
 
+bool Scene::isOver() const {
+    return _status.get<SceneStatus>()->over;
+}
+
+bool Scene::isPaused() const {
+    return _status.get<SceneStatus>()->paused;
+}
+
+int Scene::getSelection() const {
+    return _status.get<SceneStatus>()->menuSelection;
+}
+
+void Scene::kill() const {
+    _status.get_mut<SceneStatus>()->over = true;
+}
+
+void Scene::birth() const {
+    _status.get_mut<SceneStatus>()->over = false;
+}
+
+void Scene::pause() const {
+    _status.get_mut<SceneStatus>()->paused = true;
+}
+
+void Scene::resume() const {
+    _status.get_mut<SceneStatus>()->paused = false;
+}
+
+void Scene::resetSceneData() const {
+    SceneStatus *status = _status.get_mut<SceneStatus>();
+    status->paused = false;
+    status->over = false;
+    status->menuSelection = 0;
+}
+
+void Scene::setSelection(int selection) const {
+    _status.get_mut<SceneStatus>()->menuSelection = selection;
+}
+
 void Scene::activate() const {
     _display.children([](flecs::entity child) {
         child.add<Active>();
@@ -63,6 +105,7 @@ void Scene::deactivate() const {
 Menu::Menu(SDL_Renderer* ren, flecs::world* ecs, int screenWidth, int screenHeight, std::string basePath, 
     int fontSize, std::string msg, SDL_Color msgColor, std::vector<std::string> options, SDL_Color defaultColor, SDL_Color selectedColor) :
     Scene(ren, ecs, screenWidth, screenHeight, basePath) {
+    std::cout << "creating menu" << std::endl;
     _defaultColor = defaultColor;
     _selectedColor = selectedColor;
     
@@ -84,20 +127,27 @@ Menu::Menu(SDL_Renderer* ren, flecs::world* ecs, int screenWidth, int screenHeig
     // create Text components
     std::vector<Text> textOpts;
     for (int i = 0; i < options.size(); ++i) {
-        textOpts.push_back({options[i], _defaultColor, fontSize, posOpts[i]});
+        switch(i) {
+        case 0:
+            textOpts.push_back({options[i], _selectedColor, fontSize, posOpts[i]});
+            break;
+        default:
+            textOpts.push_back({options[i], _defaultColor, fontSize, posOpts[i]});
+            break;
+        }
     }
-    
-    // input component
-    _input = ecs->entity()
-        .set<OptionSelect>({0, textOpts, false})
-        .child_of(_data);
 
     // create RenderData components
+    std::cout << "create renderdata comps" << std::endl;
     std::vector<RenderData> dataOpts;
     RenderData dataPrompt = createRenderDataFromText({msg, msgColor, fontSize, msgPos}, 'l');
     for (int i = 0; i < options.size(); i++) {
         dataOpts.push_back(createRenderDataFromText(textOpts[i], 'l'));
     }
+
+    _select = ecs->entity()
+        .set<MenuSelect>({0, (int)textOpts.size()})
+        .child_of(_data);
 
     // give components to entities
     ecs->entity()
@@ -109,26 +159,29 @@ Menu::Menu(SDL_Renderer* ren, flecs::world* ecs, int screenWidth, int screenHeig
             .set<Text>(textOpts[i])
             .child_of(_display));
     }
+    std::cout << "finished making menu" << std::endl;
 }
 
 void Menu::reset() const {
-    OptionSelect *optSelect = _input.get_mut<OptionSelect>();
-    for (int i = 0; i < optSelect->options.size(); ++i) {
-        RenderData dataOpt = createRenderDataFromText(optSelect->options[i], 'l');
+    // reset options
+    MenuSelect *select = _select.get_mut<MenuSelect>();
+    for (int i = 0; i < select->numberOfOptions; ++i) {
+        RenderData dataOpt = createRenderDataFromText(*_optionDisplay[i].get<Text>(), 'l');
         RenderData *option = _optionDisplay[i].get_mut<RenderData>();
         *option = dataOpt;
     }
-    optSelect->finished = false;
+    select->selected = 0;
+    resetSceneData();
 }
 
 void Menu::update() const {} // no game logic to execute for menus
 
 void Menu::renderUpdate() const {
-    const OptionSelect *optSelect = _input.get<OptionSelect>();
-    for (int i = 0; i < optSelect->options.size(); ++i) {
+    const MenuSelect *select = _select.get<MenuSelect>();
+    for (int i = 0; i < select->numberOfOptions; ++i) {
         Text *t = _optionDisplay[i].get_mut<Text>();
         RenderData *d = _optionDisplay[i].get_mut<RenderData>();
-        if (i == optSelect->selected) {
+        if (i == select->selected) {
             t->fontColor = _selectedColor;
         } else {
             t->fontColor = _defaultColor;
@@ -139,84 +192,50 @@ void Menu::renderUpdate() const {
     }
 }
 
-bool Menu::isGameOver() const {
-    const OptionSelect *inData = _input.get<OptionSelect>();
-    return inData->finished;
-}
-
 void Menu::exec(int in) const {
-    OptionSelect *inData = _input.get_mut<OptionSelect>();
-    if (!inData->finished) {
-        switch(in) {
-        case SDLK_UP:
-        case SDLK_w:
-            inData->selected--;
-            break;
-        case SDLK_DOWN:
-        case SDLK_s:
-            inData->selected++;
-            break;
-        case SDLK_SPACE:
-            inData->finished = true;
-            break;
-        }
-        if (inData->selected == inData->options.size()) {
-            inData->selected = 0;
-        } else if (inData->selected < 0) {
-            inData->selected = inData->options.size() - 1;
-        }
+    MenuSelect *select = _select.get_mut<MenuSelect>();
+    if (isOver()) { return; }
+    switch(in) {
+    case SDLK_UP:
+    case SDLK_w:
+        select->selected--;
+        break;
+    case SDLK_DOWN:
+    case SDLK_s:
+        select->selected++;
+        break;
+    case SDLK_RETURN:
+        setSelection(select->selected);
+        kill();
+        break;
+    }
+
+    // round robin
+    if (select->selected == select->numberOfOptions) {
+        select->selected = 0;
+    } else if (select->selected < 0) {
+        select->selected = select->numberOfOptions - 1;
     }
 }
 
 Game::Game(SDL_Renderer *ren, flecs::world *ecs, std::vector<Scene*> scenes) {
+    std::cout << "creating game" << std::endl;
     // systems
-    // activate current scene - ran manually
-    _activateCurrent = ecs->system()
-        .iter([this](flecs::iter &it) {
-            const SceneManager *sm = _sceneManager.get<SceneManager>();
-            sm->scenes[sm->current]->activate();
-        });
-    _activateCurrent.disable();
-
-    // deactivate current scene - ran manually
-    _deactivateCurrent = ecs->system()
-        .iter([this](flecs::iter &it) {
-            const SceneManager *sm = _sceneManager.get<SceneManager>();
-            sm->scenes[sm->current]->deactivate();
-        });
-    _deactivateCurrent.disable();
-
-    // reset current scene - ran manually
-    _resetCurrent = ecs->system()
-        .iter([this](flecs::iter &it) {
-            const SceneManager *sm = _sceneManager.get<SceneManager>();
-            sm->scenes[sm->current]->reset();
-        });
-    _resetCurrent.disable();
-
-    // update game logic - ran manually
-    _sceneUpdate = ecs->system<const SceneManager>()
-        .kind(0)
-        .each([](const SceneManager &sm) {
-            std::cout << "Scene update" << '\t';
-            sm.scenes[sm.current]->update();
-        });
-
-    // update render components - ran automatically each PreStore phase
+    // update render components - ran automatically each PostUpdate phase
     ecs->system<const SceneManager>()
-        .kind(flecs::PreStore)
+        .kind(flecs::PostUpdate)
         .each([this](const SceneManager &sm) {
-            std::cout << "Render update" << '\t';
+            // std::cout << "render update" << '\t';
             SDL_SetRenderDrawColor(_ren, 33, 33, 33, 255);
             SDL_RenderClear(_ren);
             sm.scenes[sm.current]->renderUpdate();
         });
 
-    // draw all RenderData components - ran manually
-    _renderDraw = ecs->system<const RenderData, const Active>()
-        .kind(0)
+    // draw all RenderData components - ran automatically each PreStore phase
+    ecs->system<const RenderData, const Active>()
+        .kind(flecs::PreStore)
         .each([this](const RenderData &data, const Active &status) {
-            std::cout << "Render draw" << '\t';
+            // std::cout << "render draw" << '\t';
             int err = SDL_RenderGeometry(_ren, data.tex, data.obj.data(), data.obj.size(), nullptr, 0);
             if (err != 0) {
                 printf("%s\n", SDL_GetError());
@@ -227,36 +246,47 @@ Game::Game(SDL_Renderer *ren, flecs::world *ecs, std::vector<Scene*> scenes) {
     ecs->system()
         .kind(flecs::OnStore)
         .iter([this] (flecs::iter &it) {
-            _renderDraw.run();
-            std::cout << "Render present" << std::endl;
+            // std::cout << "render present" << std::endl;
             SDL_RenderPresent(_ren);
         });
 
+    // member variables
     _ren = ren;
     _sceneManager = ecs->entity()
         .set<SceneManager>({0, scenes});
-    _activateCurrent.run();
+    _status = ecs->entity()
+        .set<GameStatus>({true});
+    
+    // activate first scene in list
+    flecs::system setup = ecs->system<const SceneManager>()
+        .kind(0)
+        .each([](const SceneManager &sm) {
+            sm.scenes[0]->activate();
+        });
+    setup.run();
 }
 
-void Game::updateScene() const {
-    _sceneUpdate.run();
+Scene* Game::getCurrentScene() const {
+    const SceneManager *sm = _sceneManager.get<SceneManager>();
+    return sm->scenes[sm->current];
 }
 
-void Game::deactivateScene() const {
-    _deactivateCurrent.run();
+int Game::getCurrentIndex() const {
+    return _sceneManager.get<SceneManager>()->current;
 }
 
-void Game::activateScene() const {
-    _activateCurrent.run();
-}
-
-void Game::resetScene() const {
-    _resetCurrent.run();
-}
-
-void Game::setScene(int i) const {
+Scene* Game::setScene(int i) const {
     SceneManager *sm = _sceneManager.get_mut<SceneManager>();
     sm->current = i;
+    return sm->scenes[sm->current];
+}
+
+void Game::kill() const {
+    _status.get_mut<GameStatus>()->running = false;
+}
+
+bool Game::getStatus() const {
+    return _status.get<GameStatus>()->running;
 }
 
 void Game::exec(int in) const {

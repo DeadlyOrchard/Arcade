@@ -27,13 +27,18 @@ struct RenderData {
     std::vector<SDL_Vertex> obj;
 };
 
-struct OptionSelect {
-    int selected;
-    std::vector<Text> options;
-    bool finished;
+struct SceneStatus {
+    bool paused;
+    bool over;
+    int menuSelection;
 };
 
 struct Active {  };
+
+struct MenuSelect {
+    int selected;
+    int numberOfOptions;
+};
 
 // frequently used colors
 const SDL_Color GREEN {0, 155, 0, 255};
@@ -47,15 +52,27 @@ protected:
     int _width, _height, _wCenter, _hCenter;
     std::string _base, _font;
     SDL_Renderer* _ren;
-    flecs::entity _display, _data;
+    flecs::entity _display, _data, _status;
     RenderData createRenderDataFromText(Text, char) const;
 public:
+    // scene data getters
+    bool isOver() const; // returns SceneStatus.over
+    bool isPaused() const; // returns SceneStatus.paused
+    int getSelection() const; // returns SceneStatus.menuSelection
+    // scene data mutators
+    void kill() const; // set SceneStatus.over to true
+    void birth() const; // set SceneStatus.over to false
+    void pause() const; // set SceneStatus.paused to true
+    void resume() const; // set SceneStatus.paused to false
+    void setSelection(int) const; // set SceneStatus.menuSelection
+    void resetSceneData() const;
+    // other mutators
     void activate() const; // give children of _display active tag
     void deactivate() const; // remove active tag from children of _display
+    // pure virtuals
     virtual void reset() const = 0; // sets components back to default vals
     virtual void update() const = 0; // moves scene forward in time
     virtual void renderUpdate() const = 0; // updates RenderData components
-    virtual bool isGameOver() const = 0; // returns whether the game is over or not
     virtual void exec(int) const = 0; // execute an input
 };
 
@@ -63,14 +80,13 @@ public:
 class Menu : public Scene {
 private:
     SDL_Color _defaultColor, _selectedColor;
-    flecs::entity _input;
+    flecs::entity _select;
     std::vector<flecs::entity> _optionDisplay;
 public:
     Menu(SDL_Renderer*, flecs::world*, int, int, std::string, int, std::string, SDL_Color, std::vector<std::string>, SDL_Color, SDL_Color);
     void reset() const;
     void update() const;
     void renderUpdate() const;
-    bool isGameOver() const;
     void exec(int) const;
 };
 
@@ -79,19 +95,25 @@ struct SceneManager {
     std::vector<Scene*> scenes;
 };
 
+struct GameStatus {
+    bool running;
+};
+
 class Game {
 private:
     SDL_Renderer *_ren;
-    flecs::system _activateCurrent, _deactivateCurrent, _resetCurrent, _sceneUpdate, _renderDraw;
+    flecs::entity _sceneManager, _status;
 protected:
-    flecs::entity _sceneManager;
-    void updateScene() const;
-    void deactivateScene() const;
-    void activateScene() const;
-    void resetScene() const;
-    void setScene(int) const;
+    // scene data getters
+    Scene* getCurrentScene() const;
+    int getCurrentIndex() const;
+    // scene data setter
+    Scene* setScene(int) const;
+    // game status setter
+    void kill() const;
 public:
     Game(SDL_Renderer*, flecs::world*, std::vector<Scene*>);
+    bool getStatus() const;
     void exec(int) const;
     virtual void update() const = 0;
 };

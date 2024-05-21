@@ -34,7 +34,7 @@ Scene(ren, ecs, screenWidth, screenHeight, basePath) {
         .set<RenderData>(scoreData)
         .child_of(_display);
     _body = ecs->entity()
-        .set<Body>({{startingPos}, 1, true})
+        .set<Body>({{startingPos}, 1})
         .set<RenderData>(_nodeLocal)
         .child_of(_display);
     srand(time(0));
@@ -56,7 +56,6 @@ void Snake::reset() const {
     Text *score = _head.get_mut<Text>();
     score->text = "1";
     Body *body = _body.get_mut<Body>();
-    body->alive = true;
     body->list.clear();
     body->list.push_back(startingPos);
     body->length = 1;
@@ -66,11 +65,12 @@ void Snake::reset() const {
     };
     Position *foodPos = _food.get_mut<Position>();
     *foodPos = newFoodPos;
+    resetSceneData();
 }
 
 void Snake::exec(int in) const {
     Velocity *v = _head.get_mut<Velocity>();
-    Velocity vel;
+    Velocity vel = {0, 0};
     switch(in) {
     case SDLK_w:
     case SDLK_UP:
@@ -88,9 +88,12 @@ void Snake::exec(int in) const {
     case SDLK_LEFT:
         vel = {-1, 0};
         break;
+    case SDLK_ESCAPE:
+        pause();
+        break;
     }
     // snake can only go vertical if currently moving horizontal and vice versa
-    if ((v->x != 0 && vel.x == 0) || (v->y != 0 && vel.y == 0)) {
+    if ((v->x != 0 && vel.y != 0) || (v->y != 0 && vel.x != 0)) {
         *v = vel;
     }
 }
@@ -102,7 +105,8 @@ void Snake::update() const {
     Position nextPos = {pos->x + _nodeSize * vel->x, pos->y + _nodeSize * vel->y};
     // check for walls
     if (nextPos.x >= _width || nextPos.x < 0 || nextPos.y >= _height || nextPos.y < 0) {
-        body->alive = false;
+        kill();
+        std::cout << "hit wall" << std::endl;
     }
     // check for food
     Position *foodPos = _food.get_mut<Position>();
@@ -116,13 +120,12 @@ void Snake::update() const {
     // check for collision with self
     for (Position node : body->list) {
         if (node.x == nextPos.x && node.y == nextPos.y) {
-            body->alive = false;
+            kill();
+            std::cout << "hit self" << std::endl;
         }
     }
     // update head and body if still alive
-    if (!body->alive) { 
-        return; 
-    }
+    if (isOver()) { return; }
     pos->x = nextPos.x;
     pos->y = nextPos.y;
     body->list.insert(body->list.begin(), nextPos);
@@ -168,33 +171,72 @@ void Snake::renderUpdate() const {
     SDL_DestroyTexture(old);
 }
 
-bool Snake::isGameOver() const {
-    const Body *body = _body.get<Body>();
-    return !body->alive;
-}
-
 SnakeGame::SnakeGame(SDL_Renderer *ren, flecs::world *ecs, int screenWidth, int screenHeight, int nodeSize, std::string basePath) :
 Game(ren, ecs, {
     new Snake(ren, ecs, screenWidth, screenHeight, nodeSize, basePath),
-    new Menu(ren, ecs, screenWidth, screenHeight, basePath, 18, "Game Over", RED, {"New Game", "Game Select", "Quit"}, OFF_WHITE, WHITE)
+    new Menu(ren, ecs, screenWidth, screenHeight, basePath, 18, "Game Over", RED, {"New Game", "Game Select", "Quit"}, OFF_WHITE, WHITE),
+    new Menu(ren, ecs, screenWidth, screenHeight, basePath, 18, "Paused", GREEN, {"Continue", "New Game", "Game Select", "Quit"}, OFF_WHITE, WHITE)
 }) {
 }
 
 void SnakeGame::update() const {
-    const SceneManager *sm = _sceneManager.get<SceneManager>();
-    if (sm->scenes[sm->current]->isGameOver()) {
-        switch (sm->current) {
-        case 0: // the game
-            setScene(1);
-            activateScene();
+    // std::cout << "game update" << '\t';
+    Scene *scene = getCurrentScene();
+    int index = getCurrentIndex();
+    if (scene->isOver()) {
+        switch (index) {
+        case GAME_SCENE: 
+            scene = setScene(GAME_OVER_MENU);
+            scene->activate();
             break;
-        case 1: // game over menu
-            deactivateScene();
-            resetScene();
-            setScene(0);
-            resetScene();
+        case GAME_OVER_MENU: 
+            switch (scene->getSelection()) {
+            case 0: // new game
+                scene->reset();
+                scene->deactivate();
+                scene = setScene(GAME_SCENE);
+                scene->reset();
+                scene->activate();
+                break;
+            case 1: // game select
+                break;
+            case 2: // quit
+                kill();
+                break;
+            }
+            break;
+        case PAUSE_MENU:
+            switch (scene->getSelection()) {
+            case 0: // continue game
+                scene->reset();
+                scene->deactivate();
+                scene = setScene(GAME_SCENE);
+                scene->activate();
+                scene->resume();
+                break;
+            case 1: // new game
+                scene->reset();
+                scene->deactivate();
+                scene = setScene(GAME_SCENE);
+                scene->reset();
+                scene->activate();
+                break;
+            case 2: // game select
+                break;
+            case 3: // quit
+                kill();
+                break;
+            }
+        }
+    } else if (scene->isPaused()) {
+        switch (index) {
+        case GAME_SCENE:
+            scene = setScene(PAUSE_MENU);
+            scene->activate();
             break;
         }
     }
-    updateScene();
+
+    // std::cout << "scene update" << '\t';
+    scene->update();
 }

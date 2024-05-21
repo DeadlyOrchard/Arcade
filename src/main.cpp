@@ -32,32 +32,22 @@ int main(int argc, char *argv[]) {
     }
 
     SnakeGame game = SnakeGame(ren, &ecs, WIDTH, HEIGHT, NODE_SIZE, BASE_PATH);
-
     ecs.system()
         .kind(flecs::OnUpdate)
         .iter([game](flecs::iter &it) {
-            std::cout << "Game update" << '\t';
             game.update();
         });
     
     SDL_Event e;
     bool running = true;
-    while (running) {
+    while (game.getStatus()) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
             case SDL_QUIT:
                 running = false;
                 break;
             case SDL_KEYDOWN:
-                Velocity v;
-                switch(e.key.keysym.sym) {
-                // quit
-                case SDLK_ESCAPE:
-                    running = false;
-                    break;
-                default:
-                    game.exec(e.key.keysym.sym);
-                }
+                game.exec(e.key.keysym.sym);
                 break;
             }
         }
